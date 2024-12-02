@@ -83,18 +83,11 @@ bool isReportSafe(const Report& report)
 
 bool isReportSafeWithDampener(const Report& report)
 {
-  Reports dampenedReports;
-
   for (int dampenedLevelItr = 0; dampenedLevelItr < report.size(); ++dampenedLevelItr)
   {
     Report dampenedReport(report);
     dampenedReport.erase(dampenedReport.begin() + dampenedLevelItr);
 
-    dampenedReports.push_back(dampenedReport);
-  }
-
-  for (const auto& dampenedReport : dampenedReports)
-  {
     if (isReportSafe(dampenedReport))
     {
       return true;
