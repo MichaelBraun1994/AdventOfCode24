@@ -6,7 +6,7 @@
 
 using WordMatrix = std::vector<std::string>;
 
-enum DIRECTION {
+enum class DIRECTION {
   LEFT,
   LEFT_UP,
   LEFT_DOWN,
@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 {
   WordMatrix wordMatrix = readWordMatrix("input.txt");
 
-  std::cout << "XMAS found " << countWords(wordMatrix) << " times." << std::endl;
+  std::cout << "XMAS  found " << countWords(wordMatrix) << " times." << std::endl;
   std::cout << "X-MAS found " << countXmas(wordMatrix) << " times." << std::endl;
 
   return 0;
