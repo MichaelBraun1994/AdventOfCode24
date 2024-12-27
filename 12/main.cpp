@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <iomanip>
 #include <iostream>
 #include <fstream>
@@ -7,39 +8,15 @@
 #include <vector>
 #include <limits>
 #include <array>
-
+#include <deque>
 
 enum class Direction {
   UP, DOWN, LEFT, RIGHT
 };
 
-Direction turnLeft(const Direction dir)
-{
-  switch (dir) {
-    case Direction::LEFT:
-      return Direction::DOWN;
-    case Direction::UP:
-      return Direction::LEFT;
-    case Direction::RIGHT:
-      return Direction::UP;
-    case Direction::DOWN:
-      return Direction::RIGHT;
-  }
-}
-
-Direction turnRight(const Direction dir)
-{
-  switch (dir) {
-    case Direction::LEFT:
-      return Direction::UP;
-    case Direction::UP:
-      return Direction::RIGHT;
-    case Direction::RIGHT:
-      return Direction::DOWN;
-    case Direction::DOWN:
-      return Direction::LEFT;
-  }
-}
+std::array<Direction, 4> DIRECT_NEIGHBOR_DIRECTIONS {
+  Direction::UP, Direction::DOWN, Direction::LEFT, Direction::RIGHT
+};
 
 struct Position {
   size_t x;
@@ -176,12 +153,35 @@ PlantMap readPlantMap(std::string_view filePath)
   return map;
 }
 
-
 struct Region {
   long long area;
   long long perimeter;
   char plant;
   std::vector<Position> positions;
+
+  void print() const
+  {
+    size_t maxX = 0;
+    size_t maxY = 0;
+    size_t minX = std::numeric_limits<size_t>::max();
+    size_t minY = std::numeric_limits<size_t>::max();
+
+    for (const auto& pos : positions)
+    {
+      maxX = std::max(pos.x, maxX);
+      maxY = std::max(pos.y, maxY);
+      minX = std::min(pos.x, minX);
+      minY = std::min(pos.y, minY);
+    }
+
+    Map<bool> submap{maxX - minX + 1, maxY - minY + 1};
+    for (const auto& pos : positions)
+    {
+      submap.set({pos.x - minX, pos.y - minY}, true);
+    }
+    
+    submap.print();
+  }
 };
 
 int calculateNumberOfFences(const Position& pos, const PlantMap& map, char plant)
@@ -247,113 +247,94 @@ std::vector<Region> readRegions(const PlantMap& map)
   return regions;
 }
 
-int countSides(const Region& region)
+bool areDirectNeighbors(const Position& posA, const Position& posB)
 {
-  size_t maxX = 0;
-  size_t maxY = 0;
-  size_t minX = std::numeric_limits<size_t>::max();
-  size_t minY = std::numeric_limits<size_t>::max();
+  int xA = posA.x;
+  int xB = posB.x;
 
-  for (const auto& pos : region.positions)
+  int yA = posA.y;
+  int yB = posB.y;
+
+  return (((std::abs(xA - xB) == 1) && (yA == yB))
+    || ((std::abs(yA - yB) == 1) && (xA == xB)));
+}
+
+void extendSide(std::vector<Position>& edgesOfType, std::deque<Position>& side)
+{
+  bool foundAdditionalSideEdge = true;
+
+  while (foundAdditionalSideEdge)
   {
-    maxX = std::max(pos.x, maxX);
-    maxY = std::max(pos.y, maxY);
-    minX = std::min(pos.x, minX);
-    minY = std::min(pos.y, minY);
-  }
+    foundAdditionalSideEdge = false;
 
-  Map<bool> submap{maxX - minX + 1, maxY - minY + 1};
-  for (const auto& pos : region.positions)
-  {
-    submap.set({pos.x - minX, pos.y - minY}, true);
-  }
-  
-  std::cout << std::endl << "//////////" << std::endl;
-  submap.print();
-  std::cout << "//////////" << std::endl;
+    auto frontEdgeItr = std::find_if(
+        edgesOfType.begin(), edgesOfType.end(), [&side](const auto &upEdge) {
+          return areDirectNeighbors(side.front(), upEdge);
+        });
 
-  Position mostLeftLowestPosition{
-    .x = std::numeric_limits<size_t>::max(),
-    .y = 0
-  };
-
-  for (const auto& pos : region.positions)
-  {
-    if ((pos.x <= mostLeftLowestPosition.x)
-      && (pos.y >= mostLeftLowestPosition.y))
+    if (frontEdgeItr != edgesOfType.end())
     {
-      mostLeftLowestPosition = pos;
+      side.push_front(*frontEdgeItr);
+      edgesOfType.erase(frontEdgeItr);
+      foundAdditionalSideEdge = true;
     }
-  }
-  mostLeftLowestPosition.x -= minX;
-  mostLeftLowestPosition.y -= minY;
 
-  Position startPos{mostLeftLowestPosition};
-  Direction startDirection{Direction::LEFT};
+    auto backEdgeItr = std::find_if(
+        edgesOfType.begin(), edgesOfType.end(), [&side](const auto &upEdge) {
+          return areDirectNeighbors(side.back(), upEdge);
+        });
 
-  Position currentPos{startPos};
-  Direction currentDirection{startDirection};
-
-  Map<char> edgeMap{submap.getSizeX(), submap.getSizeY()};
-  for (size_t y = 0; y < edgeMap.getSizeY(); ++y)
-  {
-    for (size_t x = 0; x < edgeMap.getSizeX(); ++x)
+    if (backEdgeItr != edgesOfType.end())
     {
-      edgeMap.set({x, y}, '.');
+      side.push_back(*backEdgeItr);
+      edgesOfType.erase(backEdgeItr);
+      foundAdditionalSideEdge = true;
     }
   }
+}
 
-  do {
-    switch (currentDirection) {
-      case Direction::UP:
-        edgeMap.set({currentPos.x, currentPos.y}, '^');
-        break;
-      case Direction::DOWN:
-        edgeMap.set({currentPos.x, currentPos.y}, 'v');
-        break;
-      case Direction::LEFT:
-        edgeMap.set({currentPos.x, currentPos.y}, '<');
-        break;
-      case Direction::RIGHT:
-        edgeMap.set({currentPos.x, currentPos.y}, '>');
-        break;
-    }
+int countSidesOfType(std::vector<Position>& edgesOfType)
+{
+  int numberOfSides = 0;
+  while (!edgesOfType.empty())
+  {
+    Position currentEdge = edgesOfType.back();
+    edgesOfType.pop_back();
 
-    Position left{currentPos};
-    left.advance(turnLeft(currentDirection));
+    std::deque<Position> side{currentEdge};
+    extendSide(edgesOfType, side);
 
-    Position advanced{currentPos};
-    advanced.advance(currentDirection);
+    ++numberOfSides;
+  }
+  return numberOfSides;
+}
 
-    if (submap.contains(left) && submap.get(left))
+int countSides(const Region& region, const PlantMap& map)
+{
+  int numberOfSides = 0;
+
+  for (const auto& direction : DIRECT_NEIGHBOR_DIRECTIONS)
+  {
+    std::vector<Position> directedEdges{};
+
+    for (const auto& pos : region.positions)
     {
-      currentDirection = turnLeft(currentDirection);
-      currentPos = left;
-    }
-    else if (submap.contains(advanced) && submap.get(advanced))
-    {
-      currentPos = advanced;
-    }
-    else
-    {
-      currentDirection = turnRight(currentDirection);
-    }
+      Position probePos{pos};
+      probePos.advance(direction);
 
-    std::cout << std::endl << "==========" << std::endl;
-    edgeMap.print();
-    std::cout << "==========" << std::endl;
-  } while (!((currentPos == startPos) && (currentDirection == startDirection)));
-
-  std::cout << std::endl << "==========" << std::endl;
-  edgeMap.print();
-  std::cout << "==========" << std::endl;
-
-  return 0;
+      if (!map.contains(probePos) || (map.get(probePos) != region.plant))
+      {
+        directedEdges.push_back(pos);
+      }
+    }
+    numberOfSides += countSidesOfType(directedEdges);
+  }
+  return numberOfSides;
 }
 
 int main()
 {
-  PlantMap map = readPlantMap("exampleInput.txt");
+  PlantMap map = readPlantMap("input.txt");
   map.print();
 
   std::vector<Region> regions = readRegions(map);
@@ -362,18 +343,15 @@ int main()
   constexpr int OUTPUT_WIDTH = 3;
   for (const auto& region : regions)
   {
-    std::cout << "Plant: " << region.plant << std::endl;
-    if (region.plant == 'M')
-    {
-      countSides(region);
-    }
-    //<< " Area: "      << std::setw(OUTPUT_WIDTH) << region.area
-    //<< " Perimeter: " << std::setw(OUTPUT_WIDTH) << region.perimeter
-    //<< " Sides: "     << std::setw(OUTPUT_WIDTH) << countSides(region)
-    //<< " Price (1): " << std::setw(OUTPUT_WIDTH) << region.area * region.perimeter
-    //<< " Price (2): " << std::setw(OUTPUT_WIDTH) << region.area * countSides(region) << std::endl;
+    int sides = countSides(region, map);
+    std::cout << "Plant: " << region.plant
+      << " Area: "      << std::setw(OUTPUT_WIDTH) << region.area
+      << " Perimeter: " << std::setw(OUTPUT_WIDTH) << region.perimeter
+      << " Sides: "     << std::setw(OUTPUT_WIDTH) << sides
+      << " Price (1): " << std::setw(OUTPUT_WIDTH) << region.area * region.perimeter
+      << " Price (2): " << std::setw(OUTPUT_WIDTH) << region.area * sides << std::endl;
 
-    price += region.area * region.perimeter;
+    price += region.area * sides;
   }
 
   std::cout << "Price: " << price << std::endl;
