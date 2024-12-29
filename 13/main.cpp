@@ -1,14 +1,29 @@
 #include <cstddef>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 struct Vec2 {
-  size_t x;
-  size_t y;
+  long long x;
+  long long y;
+
+  Vec2 operator+(const Vec2& other) const
+  {
+    return {x + other.x, y + other.y};
+  }
+  bool operator==(const Vec2& other) const
+  {
+    return ((x == other.x) && (y == other.y));
+  }
 };
+
+long long getDeterminant(const Vec2& v1, const Vec2& v2)
+{
+  return (v1.x * v2.y) - (v2.x * v1.y);
+}
 
 class SlotMachine {
   Vec2 translationButtonA{};
@@ -20,9 +35,41 @@ public:
       translationButtonB(translationButtonB),
       pricePosition(pricePosition) {}
 
-  size_t getMinimalTokensNeeded() const
+  Vec2 getTranslationA() const
   {
-    return 1;
+    return translationButtonA;
+  }
+
+  Vec2 getTranslationB() const
+  {
+    return translationButtonB;
+  }
+
+  Vec2 getPricePosition() const
+  {
+    return pricePosition;
+  }
+
+  /**
+   * @brief Get the Minimal Tokens Needed Using Cramers Rule.
+   * 
+   * @return std::optional<long long> 
+   */
+  std::optional<long long> getMinimalTokensNeeded() const
+  {
+    long long detA = getDeterminant(pricePosition, translationButtonB);
+    long long detB = getDeterminant(translationButtonA, pricePosition);
+    long long det  = getDeterminant(translationButtonA, translationButtonB);
+
+    if ((det == 0) || (detA % det != 0) || (detB % det != 0))
+    {
+      return std::nullopt;
+    }
+
+    long long timesA = detA / det;
+    long long timesB = detB / det;
+
+    return timesA * 3 + timesB;
   }
 
   void print() const
@@ -57,7 +104,7 @@ Vec2 readButtonTranslation(std::string_view buttonDescription)
 
     std::string yPosString = buttonDescriptionString.substr(yPos, buttonDescriptionString.size() - yPos);
 
-    return {std::stoul(xPosString), std::stoul(yPosString)};
+    return {std::stoll(xPosString), std::stoll(yPosString)};
 }
 
 Vec2 readPricePosition(std::string_view priceDescription)
@@ -84,7 +131,8 @@ Vec2 readPricePosition(std::string_view priceDescription)
 
     std::string yPosString = buttonDescriptionString.substr(yPos, buttonDescriptionString.size() - yPos);
 
-    return {std::stoul(xPosString), std::stoul(yPosString)};
+    //return { std::stoll(xPosString), std::stoll(yPosString)};
+    return { 10000000000000 + std::stoll(xPosString), 10000000000000 + std::stoll(yPosString)};
 }
 
 std::vector<SlotMachine> readSlotMachines(std::string_view filePath)
@@ -118,12 +166,16 @@ std::vector<SlotMachine> readSlotMachines(std::string_view filePath)
 
 int main()
 {
-  std::vector<SlotMachine> slotMachines = readSlotMachines("exampleInput.txt");
+  std::vector<SlotMachine> slotMachines = readSlotMachines("input.txt");
 
+  long long tokensNeeded = 0;
   for (const auto& slotMachine : slotMachines)
   {
     slotMachine.print();
+    tokensNeeded += slotMachine.getMinimalTokensNeeded().value_or(0);
   }
+
+  std::cout << "Tokens needed: " << tokensNeeded<< std::endl;
 
   return 0;
 }
