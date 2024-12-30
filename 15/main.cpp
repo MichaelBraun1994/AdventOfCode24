@@ -1,32 +1,23 @@
-#include <iostream>
+#include <conio.h>
 #include <fstream>
+#include <iostream>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <windows.h>
 
-struct Position {
+#include <queue>
+
+struct Position
+{
   size_t x;
   size_t y;
 
-  bool operator==(const Position& other) const
-  {
-    return ((x == other.x) && (y == other.y));
-  }
-
-  bool operator!=(const Position& other) const
-  {
-    return !(*this == other);
-  }
-
-  Position operator+(const Position& other) const
-  {
-    return {x + other.x, y + other.y};
-  }
-
-  Position operator-(const Position& other) const
-  {
-    return {x - other.x, y - other.y};
-  }
+  bool operator==(const Position& other) const { return ((x == other.x) && (y == other.y)); }
+  bool operator!=(const Position& other) const { return !(*this == other); }
+  Position operator+(const Position& other) const { return {x + other.x, y + other.y}; }
+  Position operator-(const Position& other) const { return {x - other.x, y - other.y}; }
 };
 
 Position operator*(const Position& position, size_t value)
@@ -39,24 +30,36 @@ Position operator*(size_t value, const Position& position)
   return position * value;
 }
 
-enum class Direction {
-  UP, DOWN, LEFT, RIGHT
+enum class Direction
+{
+  UP,
+  DOWN,
+  LEFT,
+  RIGHT
 };
 
-enum class Tile {
-  WALL, BOX, EMPTY 
+enum class Tile
+{
+  WALL,
+  BOX,
+  BOX_LEFT,
+  BOX_RIGHT,
+  EMPTY
 };
 
-class Map{
+class Map
+{
   std::vector<std::vector<Tile>> data{};
   Position startPosition{};
   std::vector<Direction> moveInstructions{};
 
+public:
   Direction parseDirectionCharacter(const char directionCharacter)
   {
     Direction direction;
 
-    switch (directionCharacter) {
+    switch (directionCharacter)
+    {
       case '>':
         direction = Direction::RIGHT;
         break;
@@ -79,7 +82,8 @@ class Map{
   {
     char directionCharacter;
 
-    switch (direction) {
+    switch (direction)
+    {
       case Direction::UP:
         directionCharacter = '^';
         break;
@@ -98,36 +102,47 @@ class Map{
     return directionCharacter;
   }
 
-  Tile parseTileCharacter(const char tileCharacter)
+  std::vector<Tile> parseTilesCharacter(const char tileCharacter)
   {
-    Tile tile;
+    std::vector<Tile> tiles;
 
-    switch (tileCharacter) {
+    switch (tileCharacter)
+    {
       case '#':
-        tile = Tile::WALL;
+        tiles.push_back(Tile::WALL);
+        tiles.push_back(Tile::WALL);
         break;
       case 'O':
-        tile = Tile::BOX;
+        tiles.push_back(Tile::BOX_LEFT);
+        tiles.push_back(Tile::BOX_RIGHT);
         break;
       case '.':
-        tile = Tile::EMPTY;
+        tiles.push_back(Tile::EMPTY);
+        tiles.push_back(Tile::EMPTY);
         break;
       default:
         throw std::runtime_error{"Invalid tile type."};
     }
-    return tile;
+    return tiles;
   }
 
   char parseTile(const Tile& tile) const
   {
     char tileCharacter;
 
-    switch (tile) {
+    switch (tile)
+    {
       case Tile::WALL:
         tileCharacter = '#';
         break;
       case Tile::BOX:
         tileCharacter = 'O';
+        break;
+      case Tile::BOX_LEFT:
+        tileCharacter = '[';
+        break;
+      case Tile::BOX_RIGHT:
+        tileCharacter = ']';
         break;
       case Tile::EMPTY:
         tileCharacter = '.';
@@ -138,7 +153,6 @@ class Map{
     return tileCharacter;
   }
 
-public:
   Map(const std::string& filePath)
   {
     std::fstream file{filePath};
@@ -152,7 +166,7 @@ public:
     size_t y = 0;
     while (std::getline(file, currentLine))
     {
-      if (currentLine == "")
+      if (currentLine.empty())
       {
         break;
       }
@@ -166,12 +180,18 @@ public:
         {
           startPosition = {x, y};
           currentMapLine.push_back(Tile::EMPTY);
+          currentMapLine.push_back(Tile::EMPTY);
         }
         else
         {
-          currentMapLine.push_back(parseTileCharacter(tileCharacter));
+          std::vector<Tile> tiles = parseTilesCharacter(tileCharacter);
+
+          for (const auto& tile : tiles)
+          {
+            currentMapLine.push_back(tile);
+          }
         }
-        ++x;
+        x += 2;
       }
       data.push_back(currentMapLine);
       ++y;
@@ -186,61 +206,16 @@ public:
     }
   }
 
-  std::vector<Direction> getMoveInstructions() const
-  {
-    return moveInstructions;
-  }
-
-  Position getStartPosition() const
-  {
-    return startPosition;
-  }
-
-  Tile get(const Position& pos) const
-  {
-    return data[pos.y][pos.x];
-  }
-
-  void set(const Position& pos, Tile value)
-  {
-    data[pos.y][pos.x] = value;
-  }
-
-  size_t getSizeX() const
-  {
-    return data.front().size();
-  }
-
-  size_t getSizeY() const
-  {
-    return data.size();
-  }
+  std::vector<Direction> getMoveInstructions() const { return moveInstructions; }
+  Position getStartPosition() const { return startPosition; }
+  Tile get(const Position& pos) const { return data[pos.y][pos.x]; }
+  void set(const Position& pos, Tile value) { data[pos.y][pos.x] = value; }
+  size_t getSizeX() const { return data.front().size(); }
+  size_t getSizeY() const { return data.size(); }
 
   bool contains(const Position& pos) const
   {
-    return ((pos.x >= 0)
-      && (pos.x < getSizeX())
-      && (pos.y >= 0)
-      && (pos.y < getSizeY()));
-  }
-
-  void print(const Position& robotPosition) const
-  {
-    for (size_t y = 0; y < getSizeY(); ++y)
-    {
-      for (size_t x = 0; x < getSizeY(); ++x)
-      {
-        if (robotPosition == Position{x, y})
-        {
-          std::cout << "@";
-        }
-        else
-        {
-          std::cout << parseTile(get({x,y}));
-        }
-      }
-      std::cout << std::endl;
-    }
+    return ((pos.x >= 0) && (pos.x < getSizeX()) && (pos.y >= 0) && (pos.y < getSizeY()));
   }
 
   void printMoveInstructions() const
@@ -253,7 +228,102 @@ public:
   }
 };
 
-class Robot {
+struct BoxPosition
+{
+  Position left;
+  Position right;
+
+  BoxPosition() = default;
+  BoxPosition(const BoxPosition& other) = default;
+
+  BoxPosition(const Position& leftPos, const Position& rightPos) : left(leftPos), right(rightPos) {}
+
+  BoxPosition(const Position& pos, const Map& map)
+  {
+    Tile tile = map.get(pos);
+
+    if (tile == Tile::BOX_LEFT)
+    {
+      left = pos;
+      right = {pos.x + 1, pos.y};
+    }
+    else if (tile == Tile::BOX_RIGHT)
+    {
+      right = pos;
+      left = {pos.x - 1, pos.y};
+    }
+    else
+    {
+      throw std::runtime_error{"Invalid tile used for boxposition initialization."};
+    }
+  }
+};
+
+void printMap(const Map& map, const Position& robotPosition)
+{
+  for (size_t y = 0; y < map.getSizeY(); ++y)
+  {
+    for (size_t x = 0; x < map.getSizeX(); ++x)
+    {
+      if (robotPosition == Position{x, y})
+      {
+        std::cout << "@";
+      }
+      else
+      {
+        std::cout << map.parseTile(map.get({x, y}));
+      }
+    }
+    std::cout << "\n";
+  }
+}
+
+void clearScreen()
+{
+  HANDLE hConsole;
+  hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
+  COORD startPosition = {0, 0};  // home for the cursor
+  DWORD cCharsWritten;
+  CONSOLE_SCREEN_BUFFER_INFO consoleScreenBufferInfo;
+  DWORD dwConSize;
+
+  if (!GetConsoleScreenBufferInfo(hConsole, &consoleScreenBufferInfo))
+  {
+    return;
+  }
+
+  dwConSize = consoleScreenBufferInfo.dwSize.X * consoleScreenBufferInfo.dwSize.Y;
+
+  if (!FillConsoleOutputCharacter(hConsole,  // Handle to console screen buffer
+        (TCHAR)' ',                          // Character to write to the buffer
+        dwConSize,                           // Number of cells to write
+        startPosition,                       // Coordinates of first cell
+        &cCharsWritten))                     // Receive number of characters written
+  {
+    return;
+  }
+
+  // Get the current text attribute.
+  if (!GetConsoleScreenBufferInfo(hConsole, &consoleScreenBufferInfo))
+  {
+    return;
+  }
+
+  if (!FillConsoleOutputAttribute(hConsole,   // Handle to console screen buffer
+        consoleScreenBufferInfo.wAttributes,  // Character attributes to use
+        dwConSize,                            // Number of cells to set attribute
+        startPosition,                        // Coordinates of first cell
+        &cCharsWritten))                      // Receive number of characters written
+  {
+    return;
+  }
+
+  SetConsoleCursorPosition(hConsole, startPosition);
+}
+
+class Robot
+{
   Map& map;
   Position position{};
 
@@ -265,25 +335,26 @@ class Robot {
     {
       case Direction::UP:
         stepPosition.y -= 1;
-      break;
+        break;
       case Direction::DOWN:
         stepPosition.y += 1;
-      break;
+        break;
       case Direction::LEFT:
         stepPosition.x -= 1;
-      break;
+        break;
       case Direction::RIGHT:
         stepPosition.x += 1;
-      break;
+        break;
     }
     return stepPosition;
   }
 
-  Position getPositionInDirection(const Position& position, const Direction& direction, size_t n)
+  Position advancePositionInDirection(const Position& position, const Direction& direction, size_t n = 1)
   {
     Position positionOffset{0, 0};
 
-    switch (direction) {
+    switch (direction)
+    {
       case Direction::UP:
         positionOffset.y = -1;
         break;
@@ -300,37 +371,125 @@ class Robot {
     return position + n * positionOffset;
   }
 
+  std::vector<BoxPosition> getBoxesToMoveHorizontally(const Position& newPositionCandidate, const Direction& direction)
+  {
+    std::vector<BoxPosition> boxesToMove{
+      {newPositionCandidate, map}
+    };
+
+    Position newPosition;
+    Tile newPositionTile;
+
+    do {
+      newPosition = advancePositionInDirection(newPositionCandidate, direction, boxesToMove.size() * 2);
+      newPositionTile = map.get(newPosition);
+
+      if (newPositionTile == Tile::WALL)
+      {
+        return {};
+      }
+      else if (isBox(newPositionTile))
+      {
+        boxesToMove.push_back(BoxPosition{newPosition, map});
+      }
+    } while (newPositionTile != Tile::EMPTY);
+
+    return boxesToMove;
+  }
+
+  std::vector<BoxPosition> getBoxesToMoveVertically(const Position& newPositionCandidate, const Direction& direction)
+  {
+    std::vector<BoxPosition> boxesToMove{};
+
+    BoxPosition currentBox{newPositionCandidate, map};
+    std::queue<BoxPosition> processingQueue{};
+    processingQueue.push(currentBox);
+
+    while (!processingQueue.empty())
+    {
+      currentBox = processingQueue.front();
+      processingQueue.pop();
+
+      boxesToMove.push_back(currentBox);
+
+      Position newPositionLeft = advancePositionInDirection(currentBox.left, direction);
+      Position newPositionRight = advancePositionInDirection(currentBox.right, direction);
+
+      Tile newPositionTileLeft = map.get(newPositionLeft);
+      Tile newPositionTileRight = map.get(newPositionRight);
+
+      if ((newPositionTileLeft == Tile::WALL) || (newPositionTileRight == Tile::WALL))
+      {
+        return {};
+      }
+
+      if (isBox(newPositionTileLeft))
+      {
+        processingQueue.push(BoxPosition{newPositionLeft, map});
+      }
+      if (isBox(newPositionTileRight))
+      {
+        processingQueue.push(BoxPosition{newPositionRight, map});
+      }
+    }
+    return boxesToMove;
+  }
+
+  std::vector<BoxPosition> getBoxesToMove(const Position& newPositionCandidate, const Direction& direction)
+  {
+    if ((direction == Direction::LEFT) || (direction == Direction::RIGHT))
+    {
+      return getBoxesToMoveHorizontally(newPositionCandidate, direction);
+    }
+    else if ((direction == Direction::UP) || (direction == Direction::DOWN))
+    {
+      return getBoxesToMoveVertically(newPositionCandidate, direction);
+    }
+    else
+    {
+      throw std::runtime_error{"Invalid box moving direction."};
+    }
+  }
+
+  void moveBoxInDirection(const BoxPosition& boxPosition, const Direction& direction)
+  {
+    BoxPosition newBoxPos{};
+    newBoxPos.left = advancePositionInDirection(boxPosition.left, direction);
+    newBoxPos.right = advancePositionInDirection(boxPosition.right, direction);
+
+    map.set(boxPosition.left, Tile::EMPTY);
+    map.set(boxPosition.right, Tile::EMPTY);
+
+    map.set(newBoxPos.left, Tile::BOX_LEFT);
+    map.set(newBoxPos.right, Tile::BOX_RIGHT);
+  }
+
   bool moveBoxes(const Position& newPositionCandidate, const Direction& direction)
   {
-    bool movedBoxes = false;
+    std::vector<BoxPosition> boxesToMove = getBoxesToMove(newPositionCandidate, direction);
 
-    Tile nextNonBoxTile{Tile::BOX};
-    Position lookupPosition{newPositionCandidate};
-    size_t n = 0;
-
-    while (nextNonBoxTile == Tile::BOX)
+    if (boxesToMove.empty())
     {
-      lookupPosition = getPositionInDirection(newPositionCandidate, direction, n++);
-      nextNonBoxTile = map.get(lookupPosition);
+      return false;
     }
 
-    if (nextNonBoxTile == Tile::EMPTY)
+    while (!boxesToMove.empty())
     {
-      map.set(newPositionCandidate, Tile::EMPTY);
-      map.set(lookupPosition, Tile::BOX);
-      movedBoxes = true;
+      BoxPosition currentBox = boxesToMove.back();
+      boxesToMove.pop_back();
+
+      moveBoxInDirection(currentBox, direction);
     }
 
-    return movedBoxes;
+    return true;
   }
+
+  bool isBox(const Tile& tile) { return ((tile == Tile::BOX_LEFT) || (tile == Tile::BOX_RIGHT)); }
 
 public:
   Robot(Map& map) : map(map), position(map.getStartPosition()) {}
 
-  Position getPosition() const
-  {
-    return position;
-  }
+  Position getPosition() const { return position; }
 
   void move(const Direction& direction)
   {
@@ -341,7 +500,7 @@ public:
     {
       position = newPositionCandidate;
     }
-    else if (tileAhead == Tile::BOX)
+    else if (isBox(tileAhead))
     {
       if (moveBoxes(newPositionCandidate, direction))
       {
@@ -359,7 +518,7 @@ long long calculateGPSSum(const Map& map)
   {
     for (size_t x = 0; x < map.getSizeX(); ++x)
     {
-      if (map.get({x, y}) == Tile::BOX)
+      if (map.get({x, y}) == Tile::BOX_LEFT)
       {
         gpsSum += y * 100 + x;
       }
@@ -368,17 +527,61 @@ long long calculateGPSSum(const Map& map)
   return gpsSum;
 }
 
-int main()
+std::optional<Direction> getUserInput()
 {
-  Map map{"exampleInput.txt"};
+  int ch = _getch();
+
+  // Arrow keys are returned as two-character codes
+  if (ch == 0 || ch == 224)
+  {
+    switch (_getch())
+    {
+      case 72:
+        return Direction::UP;
+        break;
+      case 80:
+        return Direction::DOWN;
+        break;
+      case 75:
+        return Direction::LEFT;
+        break;
+      case 77:
+        return Direction::RIGHT;
+        break;
+      default:
+        return std::nullopt;
+    }
+  }
+  else
+  {
+    return std::nullopt;
+  }
+}
+
+int main(int argc, char** argv)
+{
   Map map{"input.txt"};
   Robot robot{map};
 
-  for (const auto& moveInstruction : map.getMoveInstructions())
+  if ((argc == 2) && std::string{argv[1]} == "-i")
   {
-    robot.move(moveInstruction);
+    std::optional<Direction> userInput{};
+    do {
+      clearScreen();
+      printMap(map, robot.getPosition());
+
+      userInput = getUserInput();
+      robot.move(userInput.value_or(Direction::UP));
+    } while (userInput.has_value());
   }
-  map.print(robot.getPosition());
+  else
+  {
+    for (const auto& moveInstruction : map.getMoveInstructions())
+    {
+      robot.move(moveInstruction);
+    }
+    printMap(map, robot.getPosition());
+  }
 
   std::cout << "GPS Sum: " << calculateGPSSum(map) << std::endl;
 
